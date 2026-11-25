@@ -77,5 +77,41 @@ npm run dev
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
 
+## 实验名称关联迁移演练（独立情景，不影响18个业务模块）
+
+解决「存量显著性检验只按实验显示名关联、两个同名实验结果会混淆」的上线问题：
+新版只认稳定实验标识 `exp_code` 与组别标识 `group_code`，由**组别版本映射表**
+登记新版评估依赖的实验/组别/版本；存量能唯一证明归属的才迁移，无法证明的
+保留旧记录待人工核查，绝不猜组。
+
+### 演练情景
+
+两个同名实验（显示名均为「首页推荐流改版实验」）：
+
+| 版本 | 实验标识 | 存量关联 | 迁移判定 |
+| --- | --- | --- | --- |
+| v1（A） | `EXP-HOME-001` | 带可核对组别号 G01 | 组别证据底账可核实，登记映射 |
+| v2（B） | `EXP-HOME-002` | 只写显示名、无组别号 | 保留旧记录待核查，补齐证据后再迁移 |
+
+### 关键规则与接口（前缀 `/api/migration`）
+
+- `POST /run`：执行/重试迁移。迁移台账按存量检验唯一、样本按作用域唯一，
+  同一批次重试幂等，换批次也不会把一条历史检验或一个样本记到两个新版批次。
+- `POST /links/{id}/complete-group`：人工核查补齐 B 的组别证据，回填稳定标识。
+- `POST /evaluation/submit`：新版评估先查组别版本映射表决定能否领取样本；
+  映射缺失时返回明确的未受理原因；幂等键防重复受理，样本被其他批次领取时逐条退回。
+- `POST /evaluation/{batch_no}/verify`：回滚后按原凭据复核，仍能查到所用组别和样本。
+- `POST /experiment/rename`：实验改名只改显示名，稳定标识与映射不变，
+  旧名登记别名，`GET /legacy/search` 按旧名仍能查历史检验。
+- `POST /legacy/evaluate`：旧版应急入口，同名实验必须显式指定版本，
+  不指定版本直接拒绝（`AMBIGUOUS_NAME`），结果按版本隔离不混淆。
+- `POST /entry-mode`：值班员在新版/旧版入口间应急切换并留痕；
+  回滚到旧版后新版评估暂停受理（`ENTRY_LEGACY_MODE`）。
+
+前端入口：侧边栏「实验关联迁移演练」（路由 `/migration-drill`）。
+命令行一键演练：`cd backend && .venv/bin/python -I scripts/migration_drill.py`。
+相关代码：`backend/app/migration_seed.py`、`migration_store.py`、
+`services/migration.py`、`routers/migration.py`、`tests/test_migration.py`。
+
 领域：数据工程
 子方向：数据分析与数据应用

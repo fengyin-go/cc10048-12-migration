@@ -27,6 +27,16 @@ class Store:
                 return row
         return None
 
+    def list_all(self, module: str) -> list[dict[str, Any]]:
+        """返回模块全量记录的浅拷贝列表，供领域加工遍历。"""
+        return [dict(row) for row in self.rows(module)]
+
+    def next_id(self, sequence: str) -> int:
+        """给加工批次等派生记录分配自增标识，避免与业务行 id 冲突。"""
+        table = self._tables.setdefault(f"_seq_{sequence}", [{"id": 0}])
+        table[0]["id"] = int(table[0].get("id", 0)) + 1
+        return int(table[0]["id"])
+
     def overview(self) -> dict[str, object]:
         modules: list[dict[str, object]] = []
         for name in self.module_names():

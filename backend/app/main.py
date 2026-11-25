@@ -12,6 +12,7 @@ from app.config import settings
 from app.routers import ROUTERS
 from app.routers.chains import router as chains_router
 from app.routers.domain import router as domain_router
+from app.routers.migration import router as migration_router
 from app.store import store
 
 app = FastAPI(title="多维指标分析与实验评估平台", version="1.0.0")
@@ -41,6 +42,9 @@ app.include_router(chains_router)
 
 # 领域业务操作路由
 app.include_router(domain_router)
+
+# 实验名称关联迁移演练路由（固定前缀，须在动态资源路由之前注册）
+app.include_router(migration_router)
 
 # 资源路由含 /api/{module}，必须放在 health / overview 之后注册，
 # 否则固定路径会被动态路径抢先匹配。
